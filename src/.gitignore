@@ -1,0 +1,48 @@
+# Arquivos e pastas do Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Arquivos de ambiente virtual
+env/
+venv/
+ENV/
+.venv/
+.env/
+*.env
+
+# Arquivos de configuração de IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Arquivos de log e temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+
+# Banco de dados local ou arquivos de teste
+*.sqlite3
+*.db
+
+# Arquivos de pacotes
+dist/
+build/
+*.egg-info/
+
+# Arquivos de testes e cobertura
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Configurações locais (por exemplo, variáveis de ambiente)
+.env
+.env.*
+
+# Docker (caso use)
+**/docker-compose.override.yml
