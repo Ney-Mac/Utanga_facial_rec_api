@@ -14,11 +14,15 @@ img_elon_test = cv2.cvtColor(img_elon_test, cv2.COLOR_BGR2RGB)
 face_loc = fr.face_locations(img_elon)[0]
 face_loc_test = fr.face_locations(img_elon_test)[0]
 
+# print(face_loc)
+
 cv2.rectangle(img_elon, (face_loc[3], face_loc[0]), (face_loc[1], face_loc[2]), (0,255,0), 2)
 cv2.rectangle(img_elon_test, (face_loc_test[3], face_loc_test[0]), (face_loc_test[1], face_loc_test[2]), (0,255,0), 2)
 
 encode_elon = fr.face_encodings(img_elon)[0]
 encode_elon_test = fr.face_encodings(img_elon_test)[0]
+
+print(encode_elon)
 
 compare = fr.compare_faces([encode_elon], encode_elon_test)
 distance = fr.face_distance([encode_elon], encode_elon_test)

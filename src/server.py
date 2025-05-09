@@ -23,3 +23,7 @@ def welcome():
 app.include_router(login_routes.router)
 app.include_router(cadastro_routes.router)
 app.include_router(turmas_routes.router)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.server:app", reload=True)

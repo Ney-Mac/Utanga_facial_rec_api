@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 
 DATABASE_URL = (
-    "mssql+pyodbc://@DESKTOP-RN92I4G\\SQLEXPRESS/DB_System_Utanga"
+    "mssql+pyodbc://@DESKTOP-RN92I4G\\SQLEXPRESS/DB_Utanga"
     "?driver=ODBC+Driver+17+for+SQL+Server"
     "&Trusted_Connection=yes"
 )
