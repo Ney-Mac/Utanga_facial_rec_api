@@ -1,11 +1,15 @@
-from fastapi import FastAPI
-from routers import login_routes
-from src.db_models import *
-from routers.adm_routes import cadastro_routes, turmas_routes
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI  # Framework para criacao da API
+from fastapi.middleware.cors import CORSMiddleware  #  CORS para habilitar permissoes de uso da API
+from src.db_models import *  # Pre-carrega os modelos (tabelas) da base de dados
 
+from src.routers import login_routes  # Rota para login dos usuarios
+from src.routers import acesso_especial_routes
+from src.routers import notas_routes
+from src.routers import users_routers
 
-app = FastAPI()
+# from src.routers import delete_user_router
+
+app = FastAPI()  # Inicia a aplicacao (Ponto inicial da API)
 
 
 app.add_middleware(
@@ -15,15 +19,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-    
-@app.get('/')
-def welcome():
-    return "No ar!"
 
 app.include_router(login_routes.router)
-app.include_router(cadastro_routes.router)
-app.include_router(turmas_routes.router)
+app.include_router(acesso_especial_routes.router)
+app.include_router(notas_routes.router)
+app.include_router(users_routers.router)
+
+# app.include_router(delete_user_router.router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("src.server:app", reload=True)
+    uvicorn.run("src.server:app", reload=True)  # Inicia o servidor Uvicorn
