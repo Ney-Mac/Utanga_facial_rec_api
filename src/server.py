@@ -2,7 +2,6 @@ from fastapi import FastAPI  # Framework para criacao da API
 from fastapi.middleware.cors import CORSMiddleware  #  CORS para habilitar permissoes de uso da API
 from src.db_models import *  # Pre-carrega os modelos (tabelas) da base de dados
 
-from src.routers import login_routes  # Rota para login dos usuarios
 from src.routers import acesso_especial_routes
 from src.routers import notas_routes
 from src.routers import users_routers
@@ -20,10 +19,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(login_routes.router)
+app.include_router(users_routers.router)
 app.include_router(acesso_especial_routes.router)
 app.include_router(notas_routes.router)
-app.include_router(users_routers.router)
 
 # app.include_router(delete_user_router.router)
 

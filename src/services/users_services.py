@@ -33,8 +33,12 @@ def fazer_login(image, id_turma_destino: str, db: Session):
             if user.tipo == 'adm':  # Logar administrador
                 return {
                     "id_usuario": user.id_usuario,
+                    "nome": user.nome,
                     "tipo": user.tipo,
-                    "nome": user.nome
+                    "matricula": None,
+                    "ano_letivo": None,
+                    "curso": None,
+                    "turma": None
                 }
             
             if not id_turma_destino:
@@ -47,9 +51,13 @@ def fazer_login(image, id_turma_destino: str, db: Session):
                 if user.tipo == "prof":  # Permitir acesso do prof na turma
                     return {
                         "id_usuario": user.id_usuario,
-                        "tipo": user.tipo,
                         "nome": user.nome,
-                        "turma_destino": id_turma_destino
+                        "tipo": user.tipo,
+                        "matricula": None,
+                        "ano_letivo": None,
+                        "curso": None,
+                        "turma": user.id_turma
+                        # "turma_destino": id_turma_destino
                     }
                     
                 else: #  Verificacoes para acesso do aluno
@@ -110,9 +118,13 @@ def fazer_login(image, id_turma_destino: str, db: Session):
                                     
                                     return {
                                         "id_usuario": user.id_usuario,
-                                        "tipo": user.tipo,
                                         "nome": user.nome,
-                                        "turma_destino": id_turma_destino
+                                        "tipo": user.tipo,
+                                        "matricula": user.matricula,
+                                        "ano_letivo": user.ano_letivo,
+                                        "curso": user.curso,
+                                        "turma": user.id_turma
+                                        # "turma_destino": id_turma_destino
                                     }
                                 
                                 dispensa = Disp(
@@ -141,9 +153,13 @@ def fazer_login(image, id_turma_destino: str, db: Session):
                                     
                                     return {
                                         "id_usuario": user.id_usuario,
-                                        "tipo": user.tipo,
                                         "nome": user.nome,
-                                        "turma_destino": id_turma_destino
+                                        "tipo": user.tipo,
+                                        "matricula": user.matricula,
+                                        "ano_letivo": user.ano_letivo,
+                                        "curso": user.curso,
+                                        "turma": user.id_turma
+                                        # "turma_destino": id_turma_destino
                                     }
                                     
     raise HTTPException(status_code=401, detail="Usuário não reconhecido.")
@@ -156,12 +172,23 @@ def listar_usuarios(tipo: str, id_usuario: int, db: Session):
         filtros.append(Usuario.tipo == tipo)
 
     if id_usuario:
-        filtros.append(Usuario.id == id_usuario)
+        filtros.append(Usuario.id_usuario == id_usuario)
 
     usuarios = db.query(Usuario).filter(*filtros).all()
 
     if usuarios:
-        return usuarios
+        return [
+            {
+                "id_usuario": usuario.id_usuario,
+                "nome": usuario.nome,
+                "tipo": usuario.tipo,
+                "matricula": usuario.matricula,
+                "ano_letivo": usuario.ano_letivo,
+                "curso": usuario.curso,
+                "turma": usuario.id_turma
+            }
+            for usuario in usuarios
+        ]
     else:
         raise HTTPException(
             status_code=404, detail="Nenhum usuário encontrado.")
@@ -207,13 +234,36 @@ def registrar_usuario(
     db.commit()
     db.refresh(novo_usuario)
 
-    return {
-        "id_usuario": novo_usuario.id_usuario,
-        "nome": novo_usuario.nome,
-        "tipo": novo_usuario.tipo,
-        "id_turma": novo_usuario.id_turma,
-        "nome_turma": novo_usuario.turma.nome_turma if novo_usuario.turma else None
-    }
+    if tipo == 'adm':
+        return {
+            "id_usuario": novo_usuario.id_usuario,
+            "nome": novo_usuario.nome,
+            "tipo": novo_usuario.tipo,
+            "matricula": None,
+            "ano_letivo": None,
+            "curso": None,
+            "turma": None
+        }
+    elif tipo == "prof":
+        return {
+            "id_usuario": novo_usuario.id_usuario,
+            "nome": novo_usuario.nome,
+            "tipo": novo_usuario.tipo,
+            "matricula": None,
+            "ano_letivo": None,
+            "curso": None,
+            "turma": novo_usuario.id_turma
+        }
+    else:
+        return {
+            "id_usuario": novo_usuario.id_usuario,
+            "nome": novo_usuario.nome,
+            "tipo": novo_usuario.tipo,
+            "matricula": None,
+            "ano_letivo": None,
+            "curso": None,
+            "turma": novo_usuario.id_turma
+        }
 
 
 def validar_usuario_existe(db: Session, img_encodings) -> bool:

@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 
 from typing import Optional
 
-from src.services.users_services import listar_usuarios, registrar_usuario
-from src.services.login_service import fazer_login
+from src.services.users_services import listar_usuarios, registrar_usuario, fazer_login
+# from src.services.login_service import fazer_login
 
 from src.utils.load_image import carregar_e_validar_imagem
 from src.utils.validacao_de_campos import validar_campos_por_tipo
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/usuario")
 
 
 @router.post("/logar")
-async def logar_usuario_endpoint(image: UploadFile = File(...), id_turma_destino: Optional[int] = Form(None), db: Session = Depends(get_db)):
+async def logar_usuario_endpoint(image: UploadFile = File(...), id_turma_destino: Optional[str] = Form(None), db: Session = Depends(get_db)):
     try:
         img = await carregar_e_validar_imagem(image)
         
@@ -26,7 +26,7 @@ async def logar_usuario_endpoint(image: UploadFile = File(...), id_turma_destino
             image=img,
             id_turma_destino=id_turma_destino,
             db=db
-        )       
+        )
         
         return {
             "message": "Login realizado com sucesso.",
@@ -55,7 +55,7 @@ async def registrar_usuarios_endpoint(
         matricula: Optional[str] = Form(None),
         ano_letivo: Optional[str] = Form(None),
         curso: Optional[str] = Form(None),
-        id_turma: Optional[int] = Form(None),
+        id_turma: Optional[str] = Form(None),
         db: Session = Depends(get_db),
         # _: dict = Depends(validar_token)
     ):

@@ -9,7 +9,7 @@ class Usuario(Base):
     id_usuario = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nome = Column(String, nullable=False)
     matricula = Column(String, nullable=True)
-    ano_lectivo = Column(String, nullable=True)
+    ano_letivo = Column(String, nullable=True)
     curso = Column(String, nullable=True)
     foto_hash = Column(String, nullable=True)
     tipo = Column(Enum('aluno', 'prof', 'adm', name="tipo_usuario"), nullable=False)
