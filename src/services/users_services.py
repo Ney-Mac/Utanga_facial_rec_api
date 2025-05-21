@@ -190,8 +190,9 @@ def listar_usuarios(tipo: str, id_usuario: int, db: Session):
             for usuario in usuarios
         ]
     else:
-        raise HTTPException(
-            status_code=404, detail="Nenhum usuário encontrado.")
+        return []
+        # raise HTTPException(
+        #     status_code=404, detail="Nenhum usuário encontrado.")
 
 
 def registrar_usuario(
