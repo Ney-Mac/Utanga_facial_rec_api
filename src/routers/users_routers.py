@@ -11,7 +11,7 @@ from src.utils.load_image import carregar_e_validar_imagem
 from src.utils.validacao_de_campos import validar_campos_por_tipo
 
 from src.core.database import get_db
-from src.core.dependencies import validar_token
+# from src.core.dependencies import validar_token
 
 
 router = APIRouter(prefix="/usuario")
@@ -57,9 +57,9 @@ async def registrar_usuarios_endpoint(
         curso: Optional[str] = Form(None),
         id_turma: Optional[str] = Form(None),
         db: Session = Depends(get_db),
-        # _: dict = Depends(validar_token)
     ):
     """
+        # _: dict = Depends(validar_token)
     Adicionar dados dos usuários
     """
     try:

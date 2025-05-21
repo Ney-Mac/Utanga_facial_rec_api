@@ -5,6 +5,7 @@ from src.db_models import *  # Pre-carrega os modelos (tabelas) da base de dados
 from src.routers import acesso_especial_routes
 from src.routers import notas_routes
 from src.routers import users_routers
+from src.routers import turmas_router
 
 # from src.routers import delete_user_router
 
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(users_routers.router)
 app.include_router(acesso_especial_routes.router)
 app.include_router(notas_routes.router)
+app.include_router(turmas_router.router)
 
 # app.include_router(delete_user_router.router)
 
