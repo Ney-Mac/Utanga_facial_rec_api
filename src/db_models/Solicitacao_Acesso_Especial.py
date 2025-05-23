@@ -1,35 +1,18 @@
-from sqlalchemy import Column, Integer, ForeignKey, Enum, Date
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, CheckConstraint
 from src.core.database import Base
 
+class SolicitacaoAcessoEspecial(Base):
+    __tablename__ = "SolicitacaoAcessoEspecial"
 
-class Solicitacao_Acesso_Especial(Base):
-    __tablename__ = "Solicitacao_Acesso_Especial"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    situacao = Column(String(9), nullable=False)
+    data_hora_pedido = Column(DateTime, nullable=False)
+    data_hora_resposta = Column(DateTime, nullable=True)
+    id_turma = Column(String(20), nullable=False)
+    id_cadeira = Column(String(20), nullable=False)
+    estudante = Column(String(20), ForeignKey("Usuario.id", ondelete="SET NULL"))
+    professor = Column(String(20), ForeignKey("Usuario.id", ondelete="SET NULL"))
 
-    id_solicitacao = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    status_solicitacao = Column(
-        Enum('pendente', 'aceite', 'rejeitado', name="status_solicitacao"),
-        nullable=False,
-    )
-    data_resposta = Column(Date, nullable=False)
-    id_usuario_solicitante = Column(
-        Integer,
-        ForeignKey("Usuario.id_usuario", ondelete="CASCADE"),
-        nullable=False,
-    )
-    id_turma_destino = Column(
-        Integer,
-        ForeignKey("Turma.id_turma", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    usuario = relationship(
-        "Usuario",
-        back_populates="solicitacoes",
-        passive_deletes=True,
-    )
-    turma = relationship(
-        "Turma",
-        back_populates="solicitacoes",
-        passive_deletes=True,
+    __table_args__ = (
+        CheckConstraint("situacao IN ('PENDENTE', 'ACEITE', 'REJEIADO')", name="chk_situacao_acesso"),
     )

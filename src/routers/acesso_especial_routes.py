@@ -4,10 +4,10 @@ from src.core.database import get_db
 from src.services.acesso_especial_service import responder_pedido
 
 from src.models.Usuario import Usuario
-from src.db_models.Usuario import Usuario as DB_User
+from src.db_models.usuario import Usuario as DB_User
 
 from src.models.SolicitacaoAcessoEspecial import SolicitacaoAcessoEspecial
-from src.db_models.Solicitacao_Acesso_Especial import Solicitacao_Acesso_Especial
+from src.db_models.solicitacao_acesso_especial import SolicitacaoAcessoEspecial as DBSolicitacaoAcessoEspecial
 
 
 router = APIRouter(prefix='/acesso-especial')
@@ -16,16 +16,16 @@ router = APIRouter(prefix='/acesso-especial')
 @router.post('/responder')
 def responder_pedido_acesso_especial(id_solicitacao: int, aceitar: bool, db: Session = Depends(get_db)):
     try:
-        pedido_acesso = db.query(Solicitacao_Acesso_Especial).filter_by(id_solicitacao=id_solicitacao).first()
+        pedido_acesso = db.query(DBSolicitacaoAcessoEspecial).filter_by(id_solicitacao=id_solicitacao).first()
         if not pedido_acesso:
             raise HTTPException(status_code=400, detail="Nenhum pedido com esse id.")
 
         solicitacao = SolicitacaoAcessoEspecial(
-            id=pedido_acesso.id_solicitacao,
-            status_solicitacao=pedido_acesso.status_solicitacao,
-            data_resposta=pedido_acesso.data_resposta,
-            id_usuario=pedido_acesso.id_usuario_solicitante,
-            id_turma=pedido_acesso.id_turma_destino
+            id=pedido_acesso.id,
+            status_solicitacao=pedido_acesso.situacao,
+            data_resposta=pedido_acesso.data_hora_resposta,
+            id_usuario=pedido_acesso.estudante,
+            id_turma=pedido_acesso.id_turma 
         )
         
         if aceitar:

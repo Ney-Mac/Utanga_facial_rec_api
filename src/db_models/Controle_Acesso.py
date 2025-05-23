@@ -1,37 +1,17 @@
-from sqlalchemy import Column, Integer, ForeignKey, Enum, Boolean, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Date, Time, String, ForeignKey, CheckConstraint
 from src.core.database import Base
 
+class ControleAcesso(Base):
+    __tablename__ = "ControleAcesso"
 
-class Controle_Acesso(Base):
-    __tablename__ = "Controle_Acesso"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    data_criacao = Column(Date, nullable=False)
+    hora_criacao = Column(Time, nullable=False)
+    tipo = Column(String(9), nullable=False)
+    id_turma = Column(Integer, nullable=False)
+    id_cadeira = Column(Integer, nullable=False)
+    id_usuario = Column(String(20), ForeignKey("Usuario.id", ondelete="SET NULL"))
 
-    id_acesso = Column(Integer, primary_key=True,
-                       index=True, autoincrement=True)
-    data_hora_entrada = Column(DateTime, nullable=False)
-    status_entrada = Column(
-        Enum("pontual", "parcial", "fora_do_limite", name="status_entrada"),
-        nullable=False,
-    )
-    acesso_especial = Column(Boolean, nullable=False)
-    id_usuario = Column(
-        Integer,
-        ForeignKey("Usuario.id_usuario", ondelete="CASCADE"),
-        nullable=False,
-    )
-    id_turma_acessada = Column(
-        Integer,
-        ForeignKey("Turma.id_turma", ondelete="SET NULL"),
-        nullable=True,
-    )
-
-    usuario = relationship(
-        "Usuario",
-        back_populates="acessos",
-        passive_deletes=True,
-    )
-    turma = relationship(
-        "Turma",
-        back_populates="acessos",
-        passive_deletes=True,
+    __table_args__ = (
+        CheckConstraint("tipo IN ('PERMITIDO', 'BLOQUEADO')", name="chk_tipo_acesso"),
     )

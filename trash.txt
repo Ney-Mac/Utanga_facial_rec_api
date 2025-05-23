@@ -1,0 +1,120 @@
+
+            # else:
+            #     turma = db.query(Turma).filter_by(id_turma=id_turma_destino).first()
+            #     if not turma:
+            #         raise HTTPException(status_code=400, detail="Turma não existe!")
+
+            #     if user.tipo == "prof":  # Permitir acesso do prof na turma
+            #         return 
+            #     {
+            #             "id_usuario": user.id_usuario,
+            #             "nome": user.nome,
+            #             "tipo": user.tipo,
+            #             "matricula": None,
+            #             "ano_letivo": None,
+            #             "curso": None,
+            #             "turma": user.id_turma
+            #             # "turma_destino": id_turma_destino
+            #         }
+                    
+            #     else: #  Verificacoes para acesso do aluno
+            #         #  Verificar se a turma esta em aulas
+            #         agora = datetime.now()
+            #         hora_atual = datetime.strptime("20:15", "%H:%M").time()
+            #         # hora_atual = agora.time()
+
+            #         dia_map = {
+            #             'mon': 'seg',
+            #             'tue': 'ter',
+            #             'wed': 'qua',
+            #             'thu': 'qui',
+            #             'fri': 'sex',
+            #             'sat': 'sab',
+            #             'sun': 'dom'
+            #         }
+
+            #         # dia_atual = dia_map.get(agora.strftime('%a').lower(), '')
+            #         dia_atual = 'sex'
+
+            #         for cadeira in turma.cadeiras:
+            #             for horario in cadeira.horarios:
+            #                 if horario.dia == dia_atual and horario.hora_inicio <= hora_atual <= horario.hora_fim:  # Retorna True se Turma em aulas
+            #                     #  Se estiver em aulas, verificar se o aluno esta autorizado a entrar (pertence a turma e nao esta dispensado)
+            #                     usuario = User(
+            #                         id=user.id_usuario,
+            #                         nome=user.nome,
+            #                         matricula=user.matricula,
+            #                         dados_face=user.foto_hash,
+            #                         ano_lectivo=user.ano_lectivo,
+            #                         curso=user.curso,
+            #                         id_turma=user.id_turma,
+            #                         tipo='aluno'
+            #                     )
+                                
+            #                     # disp = cadeira.dispensas  # retorna todas as dispensas desta cadeira nesta turma
+                                
+            #                     disp = next(
+            #                         (d for d in cadeira.dispensas if d.id_usuario == user.id_usuario),
+            #                         None
+            #                     )
+                                
+            #                     if not disp:
+            #                         #  Se nao esta dispensado, permitir acesso e marcar presenca
+            #                         status = calcular_status_entrada(horario.hora_inicio, hora_atual)
+                                    
+            #                         novo_acesso = Controle_Acesso(
+            #                             data_hora_entrada=agora,
+            #                             status_entrada=status,
+            #                             acesso_especial=False,
+            #                             id_usuario=usuario.id,
+            #                             id_turma_acessada=id_turma_destino
+            #                         )
+                                    
+            #                         db.add(novo_acesso)
+            #                         db.commit()
+                                    
+            #                         return {
+            #                             "id_usuario": user.id_usuario,
+            #                             "nome": user.nome,
+            #                             "tipo": user.tipo,
+            #                             "matricula": user.matricula,
+            #                             "ano_letivo": user.ano_letivo,
+            #                             "curso": user.curso,
+            #                             "turma": user.id_turma
+            #                             # "turma_destino": id_turma_destino
+            #                         }
+                                
+            #                     dispensa = Disp(
+            #                         id=disp.id,
+            #                         nota_p1=disp.nota_p1,
+            #                         nota_p2=disp.nota_p2,
+            #                         id_cadeira=disp.id_cadeira
+            #                     )
+                                
+            #                     if usuario.verificar_dispensa(dispensa):
+            #                         raise HTTPException(status_code=401, detail="Aluno dispensado.")
+            #                     else:
+            #                         #  Se nao esta dispensado, permitir acesso e marcar presenca
+            #                         status = calcular_status_entrada(horario.hora_inicio, hora_atual)
+                                    
+            #                         novo_acesso = Controle_Acesso(
+            #                             data_hora_entrada=agora,
+            #                             status_entrada=status,
+            #                             acesso_especial=False,
+            #                             id_usuario=usuario.id,
+            #                             id_turma_acessada=id_turma_destino
+            #                         )
+                                    
+            #                         db.add(novo_acesso)
+            #                         db.commit()
+                                    
+            #                         return {
+            #                             "id_usuario": user.id_usuario,
+            #                             "nome": user.nome,
+            #                             "tipo": user.tipo,
+            #                             "matricula": user.matricula,
+            #                             "ano_letivo": user.ano_letivo,
+            #                             "curso": user.curso,
+            #                             "turma": user.id_turma
+            #                             # "turma_destino": id_turma_destino
+            #                         }
