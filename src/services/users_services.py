@@ -104,7 +104,7 @@ async def fazer_login(image, id_turma_destino: str, db: Session):
                     return responses.JSONResponse(
                         status_code=200,
                         content={
-                            "message": f"Acesso concedido. Tenha um excelente aproveitamento, estudante {user_data['nome']}.",
+                            "message": f"Acesso concedido. Utilize a turma para adiquirir conhecimento, estudante {user_data['nome']}.",
                             "user": {
                                 "id": user_data["id"],
                                 "nome": user_data["nome"],

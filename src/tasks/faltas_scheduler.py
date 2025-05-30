@@ -75,5 +75,5 @@ def marcar_faltas():
 
 
 def iniciar_agendamentos():
-    scheduler.add_job(marcar_faltas, 'cron', hour=8, minute=11, day_of_week='mon-sat')
+    scheduler.add_job(marcar_faltas, 'cron', hour=19, minute=53, day_of_week='mon-sat')
     scheduler.start()
