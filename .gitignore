@@ -1,3 +1,5 @@
+secrets.py
+
 # Arquivos e pastas do Python
 __pycache__/
 *.py[cod]
