@@ -1,84 +1,261 @@
+import http
 import json
+import httpx
 import numpy as np
 import face_recognition as fr
-from datetime import datetime, time
-
-from fastapi import HTTPException
+from datetime import datetime, timedelta
+from fastapi import HTTPException, responses
 from sqlalchemy.orm import Session
 
-from src.models.Usuario import Usuario as User
-from src.models.Dispensa import Dispensa as Disp
+from src.entities.Usuario import Usuario
+from src.entities.ControleAcesso import ControleAcesso
+from src.utils.tipo_acesso import TipoAcesso
 
-from src.db_models.usuario import Usuario
-from src.db_models.controle_acesso import ControleAcesso
+from src.models.usuario import TableUsuario
 
-from src.utils.process_image import process_image, validar_encodings
-from src.utils.calcular_status_entrada import calcular_status_entrada
+from fastapi import HTTPException
+from src.core.configs import UTANGA_API_URL
 
-import httpx
-import http
+from src.utils.turmas.pontual import preparar_turma_pontual
+from src.utils.turmas.parcial import preparar_turma_parcial
+from src.utils.turmas.total import preparar_turma_total
+from src.utils.turmas.livre import preparar_turma_livre
 
-from fastapi import HTTPException, status
 
-
-UTANGA_API_URL = "http://localhost:8001/"
-
+def registrar_acesso(db, tipo: str, data_hora_atual: datetime, id_usuario: str = None, id_turma: str ="", id_cadeira: str =""):
+    novo_acesso = ControleAcesso(
+        data_criacao=data_hora_atual.date(),
+        hora_criacao=data_hora_atual.time(),
+        tipo=tipo,
+        id_turma=id_turma,
+        id_cadeira=id_cadeira,
+        id_usuario=id_usuario
+    )
+    try:
+        novo_acesso.registrar_entrada(db)
+    except Exception as e:
+        print(f"Erro ao registar acesso.")
 
 async def fazer_login(image, id_turma_destino: str, db: Session):
-    img_encodings = process_image(image)
-    validar_encodings(img_encodings)
+    dados_faciais = Usuario.fazer_reconhecimento(image)
+    users = db.query(TableUsuario).all()
 
-    users = db.query(Usuario).all()
-    
+    # Definir data/hora e dia atual logo no começo da função
+    agora = datetime.now()
+    dias_semana_map = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]
+    dia_atual = dias_semana_map[agora.weekday()]
+    hora_atual = agora.time()
+
     for user in users:
-        user_encodings = np.array(json.loads(user.face_encodings))
-        match = fr.compare_faces([user_encodings], img_encodings[0], tolerance=0.45)
+        dados_faciais_salvos = np.array(json.loads(user.face_encodings))
+        match = fr.compare_faces([dados_faciais_salvos], dados_faciais, tolerance=0.45)
 
         if match[0]:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"{UTANGA_API_URL}usuario/", params={"id": user.id})
-                
-                if response.status_code != 200:
-                    raise HTTPException(status_code=response.status_code, detail="Erro na chamada da API ao tentar fazer login.")
-                
-                user_data_list = response.json()
-                
-                if not user_data_list:
-                    raise HTTPException(status_code=404, detail="Usuário não encontrado na API.")
-                
-                user_data = user_data_list[0]
-                tipo = user_data.get("tipo")
+            # Preparar turma se necessário
+            if id_turma_destino == "EIMK_pontual":
+                await preparar_turma_pontual(db)
+            elif id_turma_destino == "EIMK_parcial":
+                await preparar_turma_parcial(db)
+            elif id_turma_destino == "EIMK_total":
+                await preparar_turma_total(db)
+            elif id_turma_destino == "EIMK_livre":
+                await preparar_turma_livre(db)
 
-                if tipo == "adm":
-                    return user_data
-                elif tipo == "prof":
-                    if not id_turma_destino:
-                        raise HTTPException(status_code=400, detail="Turma de destino obrigatória para professores.")
-                    return user_data
-                elif tipo == "estudante":
-                    if not id_turma_destino:
-                        raise HTTPException(status_code=400, detail="Turma de destino obrigatória para estudantes.")
-                    
-                    turma = await buscar_turma_api(id_turma_destino)
-                    em_aula, id_cadeira_em_aula = turma_em_aula(turma, datetime.now())
-                    
-                    if em_aula:
-                        if aluno_na_turma(turma, user.id):
-                            registrar_acesso(db, tipo="PERMITIDO", id_turma=id_turma_destino, id_cadeira=id_cadeira_em_aula, id_usuario=user.id)
-                            return user_data
-                        else:
-                            registrar_acesso(db, tipo="BLOQUEADO", id_turma=id_turma_destino, id_cadeira=id_cadeira_em_aula, id_usuario=user.id)
-                            raise HTTPException(status_code=401, detail="Aluno não autorizado para essa turma no momento.")
+            async with httpx.AsyncClient() as client:
+                # Buscar dados do usuário
+                response = await client.get(f"{UTANGA_API_URL}usuario/", params={"id": user.id})
+                if response.status_code != 200:
+                    raise HTTPException(status_code=response.status_code, detail="Erro ao buscar usuário.")
+
+                user_data_list = response.json()
+                if not user_data_list:
+                    raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+                user_data = user_data_list[0]
+
+                # Buscar horários da turma (1 única vez)
+                response_horarios = await client.get(f"{UTANGA_API_URL}horarios/", params={"id_turma": id_turma_destino})
+                if response_horarios.status_code != 200:
+                    raise HTTPException(status_code=500, detail="Erro ao buscar horários da turma.")
+                horarios = response_horarios.json()
+
+                aula_em_andamento = None
+                for horario in horarios:
+                    if horario["dia_semana"] != dia_atual:
+                        continue
+                    hora_inicio = datetime.strptime(horario["hora_inicio"], "%H:%M:%S").time()
+                    hora_fim = datetime.strptime(horario["hora_fim"], "%H:%M:%S").time()
+                    if hora_inicio <= hora_atual <= hora_fim:
+                        aula_em_andamento = {
+                            "id_cadeira": horario["id_cadeira"],
+                            "hora_inicio": hora_inicio
+                        }
+                        break
+
+                # Se NÃO houver aula em andamento, permitir acesso como "turma livre"
+                if not aula_em_andamento:
+                    registrar_acesso(
+                        db=db,
+                        tipo=TipoAcesso.ACEITE,
+                        data_hora_atual=agora,
+                        id_usuario=user_data["id"],
+                        id_cadeira="",
+                        id_turma=id_turma_destino
+                    )
+                    return responses.JSONResponse(
+                        status_code=200,
+                        content={
+                            "message": f"Acesso concedido. Tenha um excelente aproveitamento, estudante {user_data['nome']}.",
+                            "user": {
+                                "id": user_data["id"],
+                                "nome": user_data["nome"],
+                                "ano_lectivo": user_data["ano_lectivo"],
+                                "curso": user_data["curso"],
+                                "tipo": user_data["tipo"]
+                            }
+                        }
+                    )
+
+                # Buscar cadeiras e turmas do estudante
+                response_cadeira_turma = await client.get(f"{UTANGA_API_URL}estudante-cadeiras/{user_data['id']}")
+                if response_cadeira_turma.status_code != 200:
+                    raise HTTPException(status_code=500, detail="Erro ao buscar cadeira-turma do estudante.")
+                lista_cadeiras_turmas = response_cadeira_turma.json()
+
+                # Se houver aula em andamento, validar inscrição
+                if aula_em_andamento:
+                    inscrito = any(
+                        ct["id_cadeira"] == aula_em_andamento["id_cadeira"] and ct["id_turma"] == id_turma_destino
+                        for ct in lista_cadeiras_turmas
+                    )
+                    if not inscrito:
+                        registrar_acesso(
+                            db=db,
+                            tipo=TipoAcesso.REJEITADO,
+                            data_hora_atual=agora,
+                            id_usuario=user_data["id"],
+                            id_cadeira=aula_em_andamento["id_cadeira"],
+                            id_turma=id_turma_destino
+                        )
+                        return responses.JSONResponse(
+                            status_code=200,
+                            content={
+                                "message": "Acesso negado - você não está inscrito na cadeira em aula.",
+                                "acesso_especial_disponivel": "nao",
+                                "user": {
+                                    "id": user_data["id"],
+                                    "nome": user_data["nome"],
+                                    "ano_lectivo": user_data["ano_lectivo"],
+                                    "curso": user_data["curso"],
+                                    "tipo": user_data["tipo"]
+                                }
+                            }
+                        )
+
+                    # Calcular atraso
+                    hora_inicio_dt = datetime.combine(agora.date(), aula_em_andamento["hora_inicio"])
+                    atraso = agora - hora_inicio_dt
+
+                    if atraso > timedelta(minutes=40):
+                        registrar_acesso(
+                            db=db,
+                            tipo=TipoAcesso.REJEITADO,
+                            data_hora_atual=agora,
+                            id_usuario=user_data["id"],
+                            id_cadeira=aula_em_andamento["id_cadeira"],
+                            id_turma=id_turma_destino
+                        )
+                        return responses.JSONResponse(
+                            status_code=200,
+                            content={
+                                "message": f"Atraso superior a 40 minutos - entrada não permitida, estudante {user_data['nome']}.",
+                                "acesso_especial_disponivel": "nao",
+                                "user": {
+                                    "id": user_data["id"],
+                                    "nome": user_data["nome"],
+                                    "ano_lectivo": user_data["ano_lectivo"],
+                                    "curso": user_data["curso"],
+                                    "tipo": user_data["tipo"]
+                                }
+                            }
+                        )
+                    elif atraso > timedelta(minutes=15):
+                        registrar_acesso(
+                            db=db,
+                            tipo=TipoAcesso.REJEITADO,
+                            data_hora_atual=agora,
+                            id_usuario=user_data["id"],
+                            id_cadeira=aula_em_andamento["id_cadeira"],
+                            id_turma=id_turma_destino
+                        )
+                        return responses.JSONResponse(
+                            status_code=200,
+                            content={
+                                "message": f"Atraso superior a 15 minutos - entrada não permitida, estudante {user_data['nome']}.",
+                                "acesso_especial_disponivel": "sim",
+                                "user": {
+                                    "id": user_data["id"],
+                                    "nome": user_data["nome"],
+                                    "ano_lectivo": user_data["ano_lectivo"],
+                                    "curso": user_data["curso"],
+                                    "tipo": user_data["tipo"]
+                                }
+                            }
+                        )
                     else:
-                        registrar_acesso(db, tipo="PERMITIDO", id_turma=id_turma_destino, id_cadeira=0, id_usuario=user.id)
-                        return user_data
-                else:
-                    raise HTTPException(status_code=400, detail="Tipo de usuário desconhecido.")
-                
-    raise HTTPException(status_code=400, detail="Usuario nao reconhecido.")
-                
+                        registrar_acesso(
+                            db=db,
+                            tipo=TipoAcesso.ACEITE,
+                            data_hora_atual=agora,
+                            id_usuario=user_data["id"],
+                            id_cadeira=aula_em_andamento["id_cadeira"],
+                            id_turma=id_turma_destino
+                        )
+                        return responses.JSONResponse(
+                            status_code=200,
+                            content={
+                                "message": f"Acesso concedido. Tenha um excelente aproveitamento, estudante {user_data['nome']}.",
+                                "user": {
+                                    "id": user_data["id"],
+                                    "nome": user_data["nome"],
+                                    "ano_lectivo": user_data["ano_lectivo"],
+                                    "curso": user_data["curso"],
+                                    "tipo": user_data["tipo"]
+                                }
+                            }
+                        )
+
+                # Caso a turma não esteja em aula, permitir acesso
+                registrar_acesso(
+                    db=db,
+                    tipo=TipoAcesso.ACEITE,
+                    data_hora_atual=agora,
+                    id_usuario=user_data["id"],
+                    id_turma=id_turma_destino
+                )
+                return responses.JSONResponse(
+                    status_code=200,
+                    content={
+                        "message": f"Acesso concedido. Tenha um excelente aproveitamento, estudante {user_data['nome']}.",
+                        "user": {
+                            "id": user_data["id"],
+                            "nome": user_data["nome"],
+                            "ano_lectivo": user_data["ano_lectivo"],
+                            "curso": user_data["curso"],
+                            "tipo": user_data["tipo"]
+                        }
+                    }
+                )
+
+    # Se ninguém for reconhecido
+    registrar_acesso(db=db, tipo=TipoAcesso.REJEITADO, data_hora_atual=datetime.now())
+    raise HTTPException(status_code=400, detail="Usuário não reconhecido.")
+
 
 async def registrar_usuario(image, id_usuario: str, db: Session):
+    usuario_existente = db.query(TableUsuario).filter_by(id=id_usuario).first()
+    if usuario_existente:
+        raise HTTPException(status_code=400, detail="Usuário já está cadastrado.")
+    
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{UTANGA_API_URL}usuario/", params={"id": id_usuario})
         if not response:
@@ -86,11 +263,10 @@ async def registrar_usuario(image, id_usuario: str, db: Session):
         
         user = response.json()
         
-        img_encodings = process_image(image)
-        validar_encodings(img_encodings)
-        img_encodings = json.dumps(img_encodings[0].tolist())
+        dados_faciais = Usuario.fazer_reconhecimento(image)
+        dados_faciais_json = json.dumps(dados_faciais.tolist())
         
-        usuario = Usuario(id=id_usuario, face_encodings=img_encodings)
+        usuario = TableUsuario(id=id_usuario, face_encodings=dados_faciais_json)
         db.add(usuario)
         db.commit()
         db.refresh(usuario)
@@ -102,14 +278,11 @@ async def registrar_usuario(image, id_usuario: str, db: Session):
 
 
 async def listar_usuarios(tipo: str, id_usuario: str, db: Session):
-    local_users = db.query(Usuario).all()
+    local_users = db.query(TableUsuario).all()
     local_ids = {user.id for user in local_users}
-    # tipo = { "adm":"administrador", "prof":"professor", "estudante":"estudante" }.get(tipo)
-
+    
     async with httpx.AsyncClient() as client:
         response = await client.get(f"{UTANGA_API_URL}usuario/", params={"id": id_usuario, "tipo": tipo})
-        
-        print(response.status_code)
         
         if response.status_code != 200:
             raise HTTPException(status_code=http.HTTPStatus.NOT_FOUND, detail="Usuário não existe.")
@@ -121,103 +294,3 @@ async def listar_usuarios(tipo: str, id_usuario: str, db: Session):
             user["dados faciais"] = "sim" if user_id in local_ids else "nao"
 
         return users
-
-
-def validar_usuario_existe(db: Session, img_encodings) -> bool:
-    users = db.query(Usuario).all()
-
-    for user in users:
-        try:
-            user_encodings = np.array(json.loads(user.foto_hash))
-        except Exception:
-            continue
-
-        match = fr.compare_faces([user_encodings], img_encodings[0])
-
-        if match[0]:
-            return True
-    return False
-
-async def buscar_usuario_api(id_usuario: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{UTANGA_API_URL}usuario/", params={"id": id_usuario})
-    
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail="Usuário não encontrado na API."
-        )
-    
-    user_data_list = resp.json()
-    
-    if not user_data_list:  # Lista vazia = usuário não encontrado
-        raise HTTPException(
-            status_code=404,
-            detail="Usuário não encontrado na API (lista vazia)."
-        )
-    
-    return user_data_list[0]  # Retorna o primeiro (e único) item
-
-
-async def buscar_turma_api(id_turma: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{UTANGA_API_URL}turma/", params={"id": id_turma})
-    
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail="Turma não encontrada na API."
-        )
-    
-    turmas = resp.json()  # Sempre uma lista de turmas
-    
-    # Filtra a lista para encontrar a turma com o ID especificado
-    turma_encontrada = next((t for t in turmas if t["id"] == id_turma), None)
-    
-    if not turma_encontrada:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Turma com ID {id_turma} não encontrada na lista retornada."
-        )
-    
-    return turma_encontrada  # Retorna um dicionário (não uma lista)
-
-def turma_em_aula(turma: dict, agora: datetime):
-    dia_map = {
-        'mon': 'seg',
-        'tue': 'ter',
-        'wed': 'qua',
-        'thu': 'qui',
-        'fri': 'sex',
-        'sat': 'sab',
-        'sun': 'dom'
-    }
-    dia_atual = dia_map.get(agora.strftime('%a').lower())
-    hora_atual = agora.time()
-
-    for cadeira in turma.get("cadeiras", []):
-        for horario in cadeira.get("horarios", []):
-            if (horario["dia_semana"] == dia_atual and
-                time.fromisoformat(horario["hora_inicio"]) <= hora_atual <= time.fromisoformat(horario["hora_fim"])):
-                return True, cadeira["id"]
-    return False, None
-
-def aluno_na_turma(turma: dict, id_estudante: str):
-    for cadeira in turma.get("cadeiras", []):
-        for estudante in cadeira["estudantes"]:
-            if estudante["id"] == id_estudante:
-                return True
-    return False
-
-def registrar_acesso(db: Session, tipo: str, id_turma: str, id_cadeira: int, id_usuario: str):
-    agora = datetime.now()
-    acesso = ControleAcesso(
-        data_criacao=agora.date(),
-        hora_criacao=agora.time(),
-        tipo=tipo,
-        id_turma=int(id_turma),
-        id_cadeira=id_cadeira,
-        id_usuario=id_usuario
-    )
-    db.add(acesso)
-    db.commit()

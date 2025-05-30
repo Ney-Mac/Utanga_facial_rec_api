@@ -1,0 +1,3 @@
+from .usuario import TableUsuario
+from .controle_acesso import TableControleAcesso
+from .solicitacao_acesso_especial import TableSolicitacaoAcessoEspecial

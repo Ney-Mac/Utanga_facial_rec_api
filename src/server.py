@@ -1,13 +1,19 @@
 from fastapi import FastAPI  # Framework para criacao da API
 from fastapi.middleware.cors import CORSMiddleware  #  CORS para habilitar permissoes de uso da API
-from src.db_models import *  # Pre-carrega os modelos (tabelas) da base de dados
+from contextlib import asynccontextmanager
 
-from src.routers import acesso_especial_routes
-from src.routers import users_routers
 
-# from src.routers import delete_user_router
+from src.models import *  # Pre-carrega os modelos (tabelas) da base de dados
+from src.routers import acesso_especial_routes, users_routers, constrole_acesso_router
+from src.tasks.faltas_scheduler import iniciar_agendamentos 
 
-app = FastAPI()  # Inicia a aplicacao (Ponto inicial da API)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    iniciar_agendamentos()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)  # Inicia a aplicacao (Ponto inicial da API)
 
 
 app.add_middleware(
@@ -20,8 +26,7 @@ app.add_middleware(
 
 app.include_router(users_routers.router)
 app.include_router(acesso_especial_routes.router)
-
-# app.include_router(delete_user_router.router)
+app.include_router(constrole_acesso_router.router)
 
 if __name__ == "__main__":
     import uvicorn
